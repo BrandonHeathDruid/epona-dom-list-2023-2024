@@ -580,7 +580,9 @@ async function setActiveServer(serverKey){
   renderServerSelect(state.index.servers, serverKey);
   renderServers(state.index.servers, serverKey);
   const clans = server?.clans || [];
-  const firstClanKey = clans.length ? getClanKeyFromName(clans[0].name) : null;
+  // Skip __NOCLAN__ and find the first real clan
+  const firstRealClan = clans.find(c => getClanKeyFromName(c.name) !== '__NOCLAN__');
+  const firstClanKey = firstRealClan ? getClanKeyFromName(firstRealClan.name) : null;
   renderClans(clans, firstClanKey);
   if(firstClanKey){
     await setActiveClan(firstClanKey);
