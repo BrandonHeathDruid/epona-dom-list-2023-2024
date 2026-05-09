@@ -990,3 +990,28 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     }
   });
 });
+
+// ── Dark Mode ─────────────────────────────────────────────────────────────────
+
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = saved === 'dark' || (!saved && prefersDark);
+  
+  if(isDark) {
+    document.documentElement.classList.add('dark-mode');
+  }
+  
+  const themeToggle = document.getElementById('theme-toggle');
+  if(themeToggle) {
+    themeToggle.addEventListener('click', toggleTheme);
+  }
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.classList.toggle('dark-mode');
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+}
+
+// Initialize theme on page load
+initTheme();
