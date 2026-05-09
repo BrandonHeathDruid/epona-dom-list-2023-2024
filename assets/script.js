@@ -6,6 +6,44 @@ const MOBILE_PAGE_SIZE = 10;
 const NO_CLAN = '__NOCLAN__';
 const SEARCH_DEBOUNCE_MS = 300;
 
+const ui = {
+  skeletonCard: 'skeleton-card',
+  skeletonText: 'skeleton-text',
+  timeline: 'timeline',
+  timelineItem: 'timeline-item',
+  timelineItemNoClan: 'timeline-item-noclan',
+  card: 'member-card',
+  cardExpanded: 'member-card-expanded',
+  cardHeader: 'member-card-header',
+  cardBody: 'member-card-body',
+  cardButtons: 'member-card-buttons',
+  pillButton: 'pill-button',
+  memberCopy: 'member-copy',
+  memberToggle: 'member-toggle',
+  memberArrow: 'member-toggle-arrow',
+  memberArrowOpen: 'is-open',
+  memberToggleText: 'member-toggle-text',
+  memberDetails: 'member-details',
+  details: 'member-details-grid',
+  detail: 'member-detail',
+  detailLabel: 'member-detail-label',
+  detailValue: 'member-detail-value',
+  sectionTitle: 'section-title',
+  pager: 'pager',
+  pagerInfo: 'pager-info',
+  pagerBtn: 'pager-btn',
+  emptyState: 'empty-state',
+  searchCount: 'search-count',
+  listItem: 'list-item',
+  listItemActive: 'list-item-active',
+  listTitle: 'list-title',
+  listSub: 'list-sub',
+  clanCard: 'clan-card',
+  clanCardActive: 'clan-card-active',
+  clanCardNoClan: 'clan-card-noclan',
+  timelineButton: 'timeline-button'
+};
+
 const state = {
   index: null,
   nameIndexBuckets: new Map(),
@@ -15,10 +53,11 @@ const state = {
   clanPage: 1,
   memberPage: 1,
   clanData: [],
-  renderedData: [],   // what's currently shown (search results or clan members)
+  renderedData: [],
   clanCache: new Map(),
   isLoading: false,
-  searchTimeoutId: null
+  searchTimeoutId: null,
+  searchQuery: ''
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -29,32 +68,32 @@ function showSkeletonLoading(target = 'members') {
 
   if(target === 'members') {
     el.innerHTML = `
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-text" style="width:60%;"></div>
-        <div class="skeleton skeleton-text" style="width:40%;"></div>
+      <div class="${ui.skeletonCard}">
+        <div class="${ui.skeletonText}" style="width:60%;animation:skeleton-shimmer 2s infinite;"></div>
+        <div class="${ui.skeletonText}" style="width:40%;animation:skeleton-shimmer 2s infinite;"></div>
       </div>
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-text" style="width:70%;"></div>
-        <div class="skeleton skeleton-text" style="width:50%;"></div>
+      <div class="${ui.skeletonCard}">
+        <div class="${ui.skeletonText}" style="width:70%;animation:skeleton-shimmer 2s infinite;"></div>
+        <div class="${ui.skeletonText}" style="width:50%;animation:skeleton-shimmer 2s infinite;"></div>
       </div>
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-text" style="width:65%;"></div>
-        <div class="skeleton skeleton-text" style="width:45%;"></div>
+      <div class="${ui.skeletonCard}">
+        <div class="${ui.skeletonText}" style="width:65%;animation:skeleton-shimmer 2s infinite;"></div>
+        <div class="${ui.skeletonText}" style="width:45%;animation:skeleton-shimmer 2s infinite;"></div>
       </div>
     `;
   } else if(target === 'clans') {
     el.innerHTML = `
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-text" style="width:70%;"></div>
+      <div class="${ui.skeletonCard}">
+        <div class="${ui.skeletonText}" style="width:70%;animation:skeleton-shimmer 2s infinite;"></div>
       </div>
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-text" style="width:75%;"></div>
+      <div class="${ui.skeletonCard}">
+        <div class="${ui.skeletonText}" style="width:75%;animation:skeleton-shimmer 2s infinite;"></div>
       </div>
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-text" style="width:65%;"></div>
+      <div class="${ui.skeletonCard}">
+        <div class="${ui.skeletonText}" style="width:65%;animation:skeleton-shimmer 2s infinite;"></div>
       </div>
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-text" style="width:80%;"></div>
+      <div class="${ui.skeletonCard}">
+        <div class="${ui.skeletonText}" style="width:80%;animation:skeleton-shimmer 2s infinite;"></div>
       </div>
     `;
   }
@@ -116,6 +155,45 @@ function debounce(fn, delayMs) {
     clearTimeout(state.searchTimeoutId);
     state.searchTimeoutId = setTimeout(() => fn(...args), delayMs);
   };
+}
+
+function getActiveServer(){
+  return state.index?.servers?.find(server => server.key === state.serverKey) || null;
+}
+
+function getActiveClan(){
+  const server = getActiveServer();
+  return server?.clans?.find(clan => getClanKeyFromName(clan.name) === state.clanKey) || null;
+}
+
+function getVisibleMemberCount(){
+  if(state.searchQuery){
+    return Array.isArray(state.renderedData) ? state.renderedData.length : 0;
+  }
+  return Array.isArray(state.clanData) ? state.clanData.length : 0;
+}
+
+function updateStatusBar(){
+  const serverEl = document.getElementById('status-server');
+  const clanEl = document.getElementById('status-clan');
+  const visibleEl = document.getElementById('status-visible');
+  const modeEl = document.getElementById('status-mode');
+  const server = getActiveServer();
+  const clan = getActiveClan();
+  const visibleCount = getVisibleMemberCount();
+
+  if(serverEl){
+    serverEl.textContent = server?.name || 'No server';
+  }
+  if(clanEl){
+    clanEl.textContent = state.searchQuery ? `Search: ${state.searchQuery}` : (clan?.name || 'No clan');
+  }
+  if(visibleEl){
+    visibleEl.textContent = `${visibleCount} member${visibleCount === 1 ? '' : 's'}`;
+  }
+  if(modeEl){
+    modeEl.textContent = state.searchQuery ? 'Search' : 'Browse';
+  }
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -387,18 +465,18 @@ function sortByDate(list){
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 function renderTimeline(list, kind){
-  if(!list?.length) return '<div class="meta">No history</div>';
+  if(!list?.length) return '<div class="history-empty">No history</div>';
   const sorted = sortByDate(list);
-  return `<div class="timeline">${sorted.map(entry=>{
+  return `<div class="${ui.timeline}">${sorted.map(entry=>{
     const isNoClan = kind === 'clan' && entry.clan === '';
     const label = kind === 'level' ? `Level ${entry.lvl ?? ''}` : (isNoClan ? 'No clan' : (entry.clan || ''));
     const date = formatDate(entry.date);
-    const cls = `timeline-item${kind === 'level' ? ' level' : ''}${isNoClan ? ' noclan' : ''}`;
+    const cls = `${ui.timelineItem}${kind === 'level' ? ' timeline-item-level' : ''}${isNoClan ? ` ${ui.timelineItemNoClan}` : ''}`;
     if(kind === 'clan'){
       const fv = isNoClan ? NO_CLAN : label;
-      return `<div class="${cls}"><div class="timeline-title"><button class="filter-link" data-filter="${escapeHtml(fv)}" data-kind="clan">${escapeHtml(label)}</button></div><div class="timeline-sub">${escapeHtml(date)}</div></div>`;
+      return `<div class="${cls}"><div class="timeline-title-wrap"><button class="${ui.timelineButton}" data-filter="${escapeHtml(fv)}" data-kind="clan">${escapeHtml(label)}</button></div><div class="timeline-date">${escapeHtml(date)}</div></div>`;
     }
-    return `<div class="${cls}"><div class="timeline-title">${escapeHtml(label)}</div><div class="timeline-sub">${escapeHtml(date)}</div></div>`;
+    return `<div class="${cls}"><div class="timeline-title-text">${escapeHtml(label)}</div><div class="timeline-date">${escapeHtml(date)}</div></div>`;
   }).join('')}</div>`;
 }
 
@@ -406,30 +484,31 @@ function renderMemberCard(it, idx){
   const memberId = getMemberId(it);
   const isExpanded = state.expandedMemberId === memberId;
   return `
-    <div class="card${isExpanded?' expanded':''}" style="animation-delay:${Math.min(idx,10)*40}ms" data-member-id="${escapeHtml(memberId)}">
-      <div class="card-header">
-        <div>
-          <div class="name">${escapeHtml(it.name||'')}</div>
-          <div class="meta">Last clan: ${escapeHtml(getLatestClan(it)||'No clan')}</div>
+    <div class="${ui.card}${isExpanded ? ` ${ui.cardExpanded}` : ''}" style="animation:cardIn 500ms ease both;animation-delay:${Math.min(idx,10)*40}ms" data-member-card="true" data-member-id="${escapeHtml(memberId)}">
+      <div class="${ui.cardHeader}">
+        <div class="${ui.cardBody}">
+          <div class="member-name">${escapeHtml(it.name||'')}</div>
+          <div class="member-meta">Last clan: ${escapeHtml(getLatestClan(it)||'No clan')}</div>
         </div>
-        <div class="card-buttons">
-          <button type="button" class="member-copy" data-member-id="${escapeHtml(memberId)}" aria-label="Copy member info">Copy</button>
-          <button class="filter-link" data-filter="${escapeHtml(it.server||'')}" data-kind="server">${escapeHtml(it.server||'')}</button>
-          <button type="button" class="member-toggle" aria-expanded="${isExpanded}" aria-label="Toggle member details">
-            <span class="arrow">▾</span>
+        <div class="${ui.cardButtons}">
+          <button type="button" class="${ui.memberCopy}" data-action="member-copy" data-member-id="${escapeHtml(memberId)}" aria-label="Copy member info">Copy</button>
+          <button class="${ui.pillButton}" data-filter="${escapeHtml(it.server||'')}" data-kind="server">${escapeHtml(it.server||'')}</button>
+          <button type="button" class="${ui.memberToggle}" data-action="member-toggle" aria-expanded="${isExpanded}" aria-label="${isExpanded ? 'Hide member details' : 'Show member details'}">
+            <span class="${ui.memberArrow}${isExpanded ? ` ${ui.memberArrowOpen}` : ''}" aria-hidden="true">▾</span>
+            <span class="${ui.memberToggleText}">${isExpanded ? 'Hide' : 'Details'}</span>
           </button>
         </div>
       </div>
-      <div class="member-details"${isExpanded?'':' hidden'}>
-        <div class="details">
-          <div class="detail"><div class="detail-label">Class</div><div class="detail-value">${escapeHtml(getMainClass(it))}</div></div>
-          <div class="detail"><div class="detail-label">Last update</div><div class="detail-value">${escapeHtml(formatDate(it.last_update))}</div></div>
-          <div class="detail"><div class="detail-label">Latest clan</div><div class="detail-value"><button class="filter-link" data-filter="${escapeHtml(getLatestClan(it)||NO_CLAN)}" data-kind="clan">${escapeHtml(getLatestClan(it)||'No clan')}</button></div></div>
-          <div class="detail"><div class="detail-label">Found date</div><div class="detail-value">${escapeHtml(formatDate(it.found_date))}</div></div>
+      <div class="${ui.memberDetails}"${isExpanded?'':' hidden'}>
+        <div class="${ui.details}">
+          <div class="${ui.detail}"><div class="${ui.detailLabel}">Class</div><div class="${ui.detailValue}">${escapeHtml(getMainClass(it))}</div></div>
+          <div class="${ui.detail}"><div class="${ui.detailLabel}">Last update</div><div class="${ui.detailValue}">${escapeHtml(formatDate(it.last_update))}</div></div>
+          <div class="${ui.detail}"><div class="${ui.detailLabel}">Latest clan</div><div class="${ui.detailValue}"><button class="${ui.pillButton}" data-filter="${escapeHtml(getLatestClan(it)||NO_CLAN)}" data-kind="clan">${escapeHtml(getLatestClan(it)||'No clan')}</button></div></div>
+          <div class="${ui.detail}"><div class="${ui.detailLabel}">Found date</div><div class="${ui.detailValue}">${escapeHtml(formatDate(it.found_date))}</div></div>
         </div>
-        <div class="section-title">Clan history</div>
+        <div class="${ui.sectionTitle}">Clan history</div>
         ${renderTimeline(it.clan,'clan')}
-        <div class="section-title">Level history</div>
+        <div class="${ui.sectionTitle}">Level history</div>
         ${renderTimeline(it.level,'level')}
       </div>
     </div>`;
@@ -458,10 +537,10 @@ function renderPager(kind, page, totalPages){
   const prevDisabled = page <= 1 ? 'disabled' : '';
   const nextDisabled = page >= totalPages ? 'disabled' : '';
   return `
-    <div class="pager" role="navigation" aria-label="${kind} pagination">
-      <button type="button" class="pager-btn" data-page-kind="${kind}" data-page="${page - 1}" ${prevDisabled}>Prev</button>
-      <div class="pager-info">Page ${page} of ${totalPages}</div>
-      <button type="button" class="pager-btn" data-page-kind="${kind}" data-page="${page + 1}" ${nextDisabled}>Next</button>
+    <div class="${ui.pager}" role="navigation" aria-label="${kind} pagination">
+      <button type="button" class="${ui.pagerBtn}" data-page-kind="${kind}" data-page="${page - 1}" ${prevDisabled}>Prev</button>
+      <div class="${ui.pagerInfo}">Page ${page} of ${totalPages}</div>
+      <button type="button" class="${ui.pagerBtn}" data-page-kind="${kind}" data-page="${page + 1}" ${nextDisabled}>Next</button>
     </div>
   `;
 }
@@ -476,9 +555,10 @@ function renderMembers(items){
 
   if(!list.length){
     const message = isSearchActive
-      ? 'No members found. Try a different search.'
-      : 'No members to show.';
-    el.innerHTML = `<div class="meta empty-state">${escapeHtml(message)}</div>`;
+      ? 'No members matched that search. Try a different name, server, or clan.'
+      : 'No members to show for the selected clan yet.';
+    el.innerHTML = `<div class="${ui.emptyState}">${escapeHtml(message)}</div>`;
+    updateStatusBar();
     return;
   }
 
@@ -488,10 +568,11 @@ function renderMembers(items){
 
   let html = '';
   if(isSearchActive){
-    html += `<div class="search-result-count">Found <span class="count-number">${list.length}</span> member${list.length !== 1 ? 's' : ''}</div>`;
+    html += `<div class="${ui.searchCount}">Showing <span class="search-count-value">${list.length}</span> result${list.length !== 1 ? 's' : ''}</div>`;
   }
   html += pageItems.map(renderMemberCard).join('') + renderPager('members', page, totalPages);
   el.innerHTML = html;
+  updateStatusBar();
 }
 
 function renderServers(servers, activeKey){
@@ -502,14 +583,14 @@ function renderServers(servers, activeKey){
   el.innerHTML = '';
   [...servers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(sv=>{
     const d = document.createElement('div');
-    d.className = `list-item${sv.key===activeKey?' active':''}`;
+    d.className = `${ui.listItem}${sv.key===activeKey ? ` ${ui.listItemActive}` : ''}`;
     d.setAttribute('data-server', sv.key);
     d.innerHTML = `
       <div>
-        <div class="list-title">${escapeHtml(sv.name)}</div>
-        <div class="list-sub">${sv.count} members</div>
+        <div class="${ui.listTitle}">${escapeHtml(sv.name)}</div>
+        <div class="${ui.listSub}">${sv.count} members</div>
       </div>
-      <button type="button" class="filter-link" data-filter="${escapeHtml(sv.key)}" data-kind="server">View</button>`;
+      <button type="button" class="${ui.pillButton}" data-filter="${escapeHtml(sv.key)}" data-kind="server">View</button>`;
     el.appendChild(d);
   });
 }
@@ -524,7 +605,7 @@ function renderServerSelect(servers, activeKey){
   [...servers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(sv=>{
     const option = document.createElement('option');
     option.value = sv.key;
-    option.textContent = sv.name;
+    option.textContent = `${sv.name} (${sv.count})`;
     if(sv.key === activeKey){
       option.selected = true;
     }
@@ -542,11 +623,11 @@ function renderClans(clans, activeClanKey){
     const key = getClanKeyFromName(clan.name);
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `clan-card${key===activeClanKey?' active':''}${key===NO_CLAN?' noclan':''}`;
+    btn.className = `${ui.clanCard}${key===activeClanKey ? ` ${ui.clanCardActive}` : ''}${key===NO_CLAN ? ` ${ui.clanCardNoClan}` : ''}`;
     btn.setAttribute('data-clan', key);
     btn.setAttribute('aria-pressed', key===activeClanKey?'true':'false');
     btn.setAttribute('aria-label', `Select ${escapeHtml(clan.name||'No clan')} clan`);
-    btn.innerHTML = `<div class="list-title">${escapeHtml(clan.name||'No clan')}</div><div class="list-sub">${clan.count} members</div>`;
+    btn.innerHTML = `<div class="${ui.listTitle}">${escapeHtml(clan.name||'No clan')}</div><div class="${ui.listSub}">${clan.count} members</div>`;
     el.appendChild(btn);
   });
   if(totalPages > 1){
@@ -562,6 +643,9 @@ async function setActiveServer(serverKey){
   state.serverKey = serverKey;
   state.expandedMemberId = null;
   state.clanPage = 1;
+  state.searchQuery = '';
+  state.clanData = [];
+  state.renderedData = [];
   const serverSelect = document.getElementById('server-select');
   const filterInput = document.getElementById('filter');
   const clearSearchBtn = document.getElementById('clear-search');
@@ -584,6 +668,8 @@ async function setActiveServer(serverKey){
   const firstRealClan = clans.find(c => getClanKeyFromName(c.name) !== '__NOCLAN__');
   const firstClanKey = firstRealClan ? getClanKeyFromName(firstRealClan.name) : null;
   renderClans(clans, firstClanKey);
+  state.clanKey = firstClanKey;
+  updateStatusBar();
   if(firstClanKey){
     await setActiveClan(firstClanKey);
   }
@@ -593,6 +679,9 @@ async function setActiveClan(clanKey){
   state.clanKey = clanKey;
   state.expandedMemberId = null;
   state.memberPage = 1;
+  state.searchQuery = '';
+  state.clanData = [];
+  state.renderedData = [];
   if(!clanKey){ state.clanData=[]; renderMembers([]); return; }
   const server = state.index.servers.find(s=>s.key===state.serverKey);
   const clan = server?.clans.find(c=>getClanKeyFromName(c.name)===clanKey);
@@ -603,6 +692,7 @@ async function setActiveClan(clanKey){
     const data = await loadClanFile(getClanFilePath(state.serverKey, clanKey));
     state.clanData = data;
     renderMembers(data);
+    updateStatusBar();
   } catch (err) {
     console.error('Failed to load clan:', err);
     showError('Failed to load clan members. Please try again.');
@@ -617,6 +707,7 @@ async function applySearch(){
   const q = document.getElementById('filter').value.trim().toLowerCase();
   state.expandedMemberId = null;
   state.memberPage = 1;
+  state.searchQuery = q;
 
   if(!q){
     // Restore current clan view
@@ -659,29 +750,30 @@ const debouncedApplySearch = debounce(applySearch, SEARCH_DEBOUNCE_MS);
 // ── Toggle text ───────────────────────────────────────────────────────────────
 
 function initToggleText(){
-  const toggleButtons = document.querySelectorAll('.collapse-toggle');
+  const toggleButtons = document.querySelectorAll('[data-target]');
 
   toggleButtons.forEach(btn => {
-    const target = btn.getAttribute('data-bs-target');
+    const target = btn.getAttribute('data-target');
+    if(!target) return;
     const collapseEl = document.querySelector(target);
     if(!collapseEl) return;
 
     function updateText(){
-      const isShown = collapseEl.classList.contains('show');
+      const isHidden = collapseEl.classList.contains('hidden');
       const textEl = btn.querySelector('.toggle-text');
       if(textEl){
-        textEl.textContent = isShown ? 'Hide' : 'Show';
+        textEl.textContent = isHidden ? 'Show' : 'Hide';
       }
-      btn.setAttribute('aria-expanded', isShown ? 'true' : 'false');
+      btn.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
     }
 
-    // Wait for Bootstrap to initialize collapse state
-    setTimeout(() => {
-      updateText();
-    }, 10);
+    // Initial state
+    updateText();
 
-    collapseEl.addEventListener('shown.bs.collapse', updateText);
-    collapseEl.addEventListener('hidden.bs.collapse', updateText);
+    btn.addEventListener('click', () => {
+      collapseEl.classList.toggle('hidden');
+      updateText();
+    });
   });
 }
 
@@ -731,6 +823,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     if(firstServer){
       await setActiveServer(firstServer.key);
     }
+    updateStatusBar();
   } catch (err) {
     console.error('Failed to initialize:', err);
     showSkeletonLoading();
@@ -774,12 +867,16 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // Collapse/expand defaults by viewport
   const applyCollapseDefaults = ()=>{
     const isDesktop = window.matchMedia('(min-width:900px)').matches;
-    ['serversCollapse','clansCollapse'].forEach(id=>{
+    ['clansCollapse'].forEach(id=>{
       const el = document.getElementById(id);
       if(!el) return;
-      const btn = el.previousElementSibling?.querySelector('.collapse-toggle');
-      if(isDesktop){ el.classList.add('show'); btn?.setAttribute('aria-expanded','true'); }
-      else { el.classList.remove('show'); btn?.setAttribute('aria-expanded','false'); }
+      const btn = document.querySelector(`[data-target="#${id}"]`);
+      if(isDesktop){ el.classList.remove('hidden'); btn?.setAttribute('aria-expanded','true'); }
+      else { el.classList.add('hidden'); btn?.setAttribute('aria-expanded','false'); }
+      if(btn){
+        const textEl = btn.querySelector('.toggle-text');
+        if(textEl) textEl.textContent = isDesktop ? 'Hide' : 'Show';
+      }
     });
   };
   applyCollapseDefaults();
@@ -787,7 +884,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   // Global click delegation
   document.body.addEventListener('click', async e=>{
-    const pagerBtn = e.target.closest('.pager-btn');
+    const pagerBtn = e.target.closest('[data-page-kind]');
     if(pagerBtn){
       const kind = pagerBtn.getAttribute('data-page-kind');
       const page = parseInt(pagerBtn.getAttribute('data-page') || '1', 10);
@@ -802,10 +899,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       return;
     }
     // Accordion toggle
-    const toggle = e.target.closest('.member-toggle');
+    const toggle = e.target.closest('[data-action="member-toggle"]');
     if(toggle){
       e.preventDefault();
-      const card = toggle.closest('.card');
+      const card = toggle.closest('[data-member-card]');
       if(!card) return;
       const mid = card.getAttribute('data-member-id')||'';
       state.expandedMemberId = state.expandedMemberId === mid ? null : mid;
@@ -830,9 +927,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       return;
     }
 
-    const copyBtn = e.target.closest('.member-copy');
+    const copyBtn = e.target.closest('[data-action="member-copy"]');
     if(copyBtn){
-      const card = copyBtn.closest('.card');
+      const card = copyBtn.closest('[data-member-card]');
       if(!card){
         return;
       }
@@ -876,7 +973,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
     // Server list row click
     const serverRow = e.target.closest('[data-server]');
-    if(serverRow && !e.target.closest('.filter-link')){
+    if(serverRow && !e.target.closest('[data-filter]')){
       state.expandedMemberId = null;
       document.getElementById('filter').value = '';
       await setActiveServer(serverRow.getAttribute('data-server'));
@@ -885,7 +982,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
     // Clan card click
     const clanCard = e.target.closest('[data-clan]');
-    if(clanCard && clanCard.classList.contains('clan-card')){
+    if(clanCard && clanCard.matches('button[data-clan]')){
       state.expandedMemberId = null;
       document.getElementById('filter').value = '';
       document.getElementById('clear-search').hidden = true;

@@ -3,69 +3,65 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>data</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-  <link rel="stylesheet" href="assets/style.css">
+  <title>Character History Browser</title>
+  <link rel="stylesheet" href="/assets/style.css" />
 </head>
-<body class="bg-light">
+<body>
   <a class="skip-link" href="#members-panel">Skip to members</a>
-  <div class="container-fluid py-3">
-  <header class="hero">
-    <div class="hero-text">
-      <div class="controls">
-        <div class="server-select-group">
-          <label for="server-select" class="server-label">Server</label>
-          <select id="server-select" class="form-select server-select" aria-describedby="filter-help"></select>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="toolbar">
+        <div class="field field-server">
+          <label for="server-select" class="field-label">Server</label>
+          <select id="server-select" class="field-control field-select" aria-describedby="filter-help"></select>
         </div>
-        <div class="search-group">
+        <div class="field field-search">
           <label class="sr-only" for="filter">Search members</label>
-          <input id="filter" class="form-control search-input" placeholder="Search by player name" aria-describedby="filter-help" />
-          <button id="clear-search" class="btn-clear-search" type="button" aria-label="Clear search" hidden>✕</button>
+          <input id="filter" class="field-control field-input" placeholder="Search names, clans, or servers" aria-describedby="filter-help" />
+          <button id="clear-search" class="clear-search" type="button" aria-label="Clear search" hidden>✕</button>
         </div>
-        <div id="filter-help" class="sr-only">Select a server first, then type a player name to search within that server.</div>
+        <div id="filter-help" class="field-help">Search matches player names, clans, and server names within the selected server.</div>
       </div>
-    </div>
-  </header>
-  <main>
-    <div class="panel-grid">
-      <section class="panel order-1 order-lg-1 panel-scroll" id="clans-panel">
+    </header>
+    <main class="content-grid">
+      <section class="panel clans-panel" id="clans-panel">
         <div class="panel-header">
-          <h2>Clans</h2>
-          <button class="btn btn-sm btn-outline-secondary collapse-toggle" data-bs-toggle="collapse" data-bs-target="#clansCollapse" aria-expanded="true" aria-controls="clansCollapse"><span class="toggle-text">Hide</span></button>
+          <h2 class="panel-title panel-title-clans">Clans</h2>
+          <button class="panel-toggle" data-target="#clansCollapse" aria-expanded="true" aria-controls="clansCollapse"><span class="toggle-text">Hide</span></button>
         </div>
-        <div id="clansCollapse" class="collapse show">
+        <div id="clansCollapse" class="panel-collapse">
           <div id="clans" class="clan-cards"></div>
         </div>
       </section>
-      <section class="panel order-2 order-lg-2" id="members-panel" aria-label="Members">
-        <h2>Members</h2>
+      <section class="panel members-panel" id="members-panel" aria-label="Members">
+        <div class="panel-header">
+          <h2 class="panel-title panel-title-members">Members</h2>
+        </div>
         <div id="members" class="member-list" role="region" aria-live="polite"></div>
       </section>
-    </div>
-  </main>
+    </main>
   </div>
-  <div id="error-modal" class="error-modal hidden">
-    <div class="error-modal-content">
-      <div class="error-modal-header">
-        <h2>Error</h2>
-        <button id="error-modal-close" class="error-modal-close" aria-label="Close error">✕</button>
+  <div id="error-modal" class="modal-overlay hidden">
+    <div class="modal-card modal-card-error">
+      <div class="modal-header">
+        <h2 class="modal-title modal-title-error">Error</h2>
+        <button id="error-modal-close" class="modal-close modal-close-error" aria-label="Close error">✕</button>
       </div>
-      <p id="error-modal-message"></p>
-      <button id="error-modal-reload" class="error-modal-btn">Reload Page</button>
+      <p id="error-modal-message" class="modal-message"></p>
+      <button id="error-modal-reload" class="modal-action modal-action-error">Reload Page</button>
     </div>
   </div>
-  <div id="copy-modal" class="error-modal hidden" role="dialog" aria-modal="true" aria-labelledby="copy-modal-title">
-    <div class="error-modal-content copy-modal-content">
-      <div class="error-modal-header">
-        <h2 id="copy-modal-title">Copy unavailable</h2>
-        <button id="copy-modal-close" class="error-modal-close" aria-label="Close copy popup">✕</button>
+  <div id="copy-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="copy-modal-title">
+    <div class="modal-card modal-card-copy">
+      <div class="modal-header">
+        <h2 id="copy-modal-title" class="modal-title modal-title-copy">Copy unavailable</h2>
+        <button id="copy-modal-close" class="modal-close modal-close-copy" aria-label="Close copy popup">✕</button>
       </div>
-      <p id="copy-modal-status"></p>
-      <textarea id="copy-modal-text" class="copy-modal-text" readonly spellcheck="false"></textarea>
-      <button id="copy-modal-copy" class="error-modal-btn" type="button">Copy</button>
+      <p id="copy-modal-status" class="modal-message"></p>
+      <textarea id="copy-modal-text" class="copy-textarea" readonly spellcheck="false"></textarea>
+      <button id="copy-modal-copy" class="modal-action modal-action-copy" type="button">Copy</button>
     </div>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
-  <script src="assets/script.js?v=20260505a"></script>
+  <script type="module" src="/assets/script.js"></script>
 </body>
 </html>
