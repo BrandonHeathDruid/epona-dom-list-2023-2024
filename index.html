@@ -11,17 +11,28 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="toolbar">
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
         <div class="field field-server">
           <label for="server-select" class="field-label">Server</label>
-          <select id="server-select" class="field-control field-select" aria-describedby="filter-help"></select>
+          <select id="server-select" class="field-control field-select"></select>
         </div>
         <div class="field field-search">
           <label class="sr-only" for="filter">Search members</label>
-          <input id="filter" class="field-control field-input" placeholder="Search names, clans, or servers" aria-describedby="filter-help" />
+          <input id="filter" class="field-control field-input" placeholder="Search names, clans, or servers" />
           <button id="clear-search" class="clear-search" type="button" aria-label="Clear search" hidden>✕</button>
         </div>
-        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
-        <div id="filter-help" class="field-help">Search matches player names, clans, and server names within the selected server.</div>
+        
+        <div class="field field-mode">
+          <div class="field-mode-copy">
+            <div id="search-mode-label" class="field-label">Search full clan history</div>
+          </div>
+          <button id="search-mode-toggle" class="search-mode-toggle" type="button" role="switch" aria-checked="false" aria-labelledby="search-mode-label" title="Clan history is off">
+            <span class="search-mode-toggle-track" aria-hidden="true">
+              <span class="search-mode-toggle-thumb"></span>
+            </span>
+            <span class="search-mode-toggle-state" aria-hidden="true">Off</span>
+          </button>
+        </div>
       </div>
     </header>
     <main class="content-grid">

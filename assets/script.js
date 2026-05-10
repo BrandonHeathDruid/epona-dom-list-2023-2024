@@ -47,6 +47,7 @@ const ui = {
 const state = {
   index: null,
   nameIndexBuckets: new Map(),
+  historyIndexBuckets: new Map(),
   serverKey: null,
   clanKey: null,
   expandedMemberId: null,
@@ -57,7 +58,8 @@ const state = {
   clanCache: new Map(),
   isLoading: false,
   searchTimeoutId: null,
-  searchQuery: ''
+  searchQuery: '',
+  searchMode: 'current' // 'current' or 'history'
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -192,7 +194,11 @@ function updateStatusBar(){
     visibleEl.textContent = `${visibleCount} member${visibleCount === 1 ? '' : 's'}`;
   }
   if(modeEl){
-    modeEl.textContent = state.searchQuery ? 'Search' : 'Browse';
+    if(state.searchQuery){
+      modeEl.textContent = `Search (${state.searchMode === 'history' ? 'clan history' : 'current clan'})`;
+    } else {
+      modeEl.textContent = 'Browse';
+    }
   }
 }
 
@@ -286,6 +292,41 @@ function getSearchBuckets(query){
   return [...buckets].slice(0, 4);
 }
 
+function getMatchingHistoryClanKeys(serverKey, query){
+  const server = state.index?.servers?.find(entry => entry.key === serverKey) || null;
+  const text = normalizeSearchValue(query);
+  if(!server || !text){
+    return [];
+  }
+
+  // Get the buckets that match the query (only clans starting with these letters)
+  const buckets = getSearchBuckets(query);
+  if(!buckets.length){
+    return [];
+  }
+
+  const clanKeys = [];
+  const seen = new Set();
+  for(const clan of server.clans || []){
+    const clanKey = getClanKeyFromName(clan.name);
+    if(clanKey === NO_CLAN || seen.has(clanKey)){
+      continue;
+    }
+    
+    const normalizedName = normalizeSearchValue(clan.name);
+    // Only process clans that start with one of the search buckets
+    const startsWithBucket = buckets.some(bucket => 
+      normalizedName.startsWith(bucket) || normalizeSearchValue(clanKey).startsWith(bucket)
+    );
+    
+    if(startsWithBucket && (normalizedName.includes(text) || normalizeSearchValue(clanKey).includes(text))){
+      seen.add(clanKey);
+      clanKeys.push(clanKey);
+    }
+  }
+  return clanKeys;
+}
+
 function normalizeSearchValue(value){
   if(value === null || value === undefined){
     return '';
@@ -308,6 +349,25 @@ async function loadServerNameIndexBucket(serverKey, bucket){
   } catch (err) {
     console.warn(`Failed to load name index bucket ${cacheKey}:`, err);
     state.nameIndexBuckets.set(cacheKey, []);
+    return [];
+  }
+}
+
+async function loadServerHistoryIndexBucket(serverKey, bucket){
+  const safeServerKey = serverKey || '';
+  const safeBucket = bucket || '_';
+  const cacheKey = `${safeServerKey}:${safeBucket}`;
+  if(state.historyIndexBuckets.has(cacheKey)){
+    return state.historyIndexBuckets.get(cacheKey);
+  }
+  try {
+    const data = await loadDataResource(`data/servers/${safeServerKey}/history-clan-index/${safeBucket}.data`);
+    const list = Array.isArray(data) ? data : [];
+    state.historyIndexBuckets.set(cacheKey, list);
+    return list;
+  } catch (err) {
+    console.warn(`Failed to load history index bucket ${cacheKey}:`, err);
+    state.historyIndexBuckets.set(cacheKey, []);
     return [];
   }
 }
@@ -712,6 +772,7 @@ async function applySearch(){
   if(!q){
     // Restore current clan view
     renderMembers(state.clanData || []);
+    updateStatusBar();
     return;
   }
 
@@ -725,18 +786,49 @@ async function applySearch(){
   setLoading(true);
   try {
     const serverKey = document.getElementById('server-select')?.value || state.serverKey;
-    const nameIndex = (await Promise.all(buckets.map(bucket=>loadServerNameIndexBucket(serverKey, bucket)))).flat();
-    const matches = nameIndex.filter(e => [e.name, e.server, e.clan]
-      .some(v => normalizeSearchValue(v).includes(q)));
+    
+    if(state.searchMode === 'history'){
+      const historyClanKeys = getMatchingHistoryClanKeys(serverKey, q);
+      if(historyClanKeys.length){
+        const historyIndex = (await Promise.all(historyClanKeys.map(clanKey=>loadServerHistoryIndexBucket(serverKey, clanKey)))).flat();
+        const seen = new Set();
+        const matches = historyIndex.filter(entry => {
+          const entryId = `${normalizeSearchValue(entry.name)}|${normalizeSearchValue(entry.server)}`;
+          if(seen.has(entryId)){
+            return false;
+          }
+          const matched = [entry.name, entry.server, entry.clan, entry.historyClan, entry.historyClanKey]
+            .some(v => normalizeSearchValue(v).includes(q));
+          if(matched){
+            seen.add(entryId);
+          }
+          return matched;
+        });
 
-    if(!matches.length){
-      renderMembers([]);
-      return;
+        renderMembers(matches.slice(0, SEARCH_MAX));
+        return;
+      }
+
+      const nameIndex = (await Promise.all(buckets.map(bucket=>loadServerNameIndexBucket(serverKey, bucket)))).flat();
+      const matches = nameIndex.filter(e => [e.name, e.server, e.clan]
+        .some(v => normalizeSearchValue(v).includes(q)));
+
+      renderMembers(matches.slice(0, SEARCH_MAX));
+    } else {
+      // Search current clan index (default)
+      const nameIndex = (await Promise.all(buckets.map(bucket=>loadServerNameIndexBucket(serverKey, bucket)))).flat();
+      const matches = nameIndex.filter(e => [e.name, e.server, e.clan]
+        .some(v => normalizeSearchValue(v).includes(q)));
+
+      if(!matches.length){
+        renderMembers([]);
+        return;
+      }
+
+      // Use name-index entries directly as search results
+      const results = matches.slice(0, SEARCH_MAX);
+      renderMembers(results);
     }
-
-    // Use name-index entries directly as search results
-    const results = matches.slice(0, SEARCH_MAX);
-    renderMembers(results);
   } catch (err) {
     console.error('Search failed:', err);
     showError('Search failed. Please try again.');
@@ -815,8 +907,34 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     serverSelect.addEventListener('change', async ()=>{
       const nextServer = serverSelect.value || null;
       await setActiveServer(nextServer);
-      await applySearch();
+      // Debounced search to avoid immediate multiple queries
+      debouncedApplySearch();
     });
+
+    // Search mode toggle
+    const searchModeToggle = document.getElementById('search-mode-toggle');
+    if(searchModeToggle){
+      const syncSearchModeToggle = ()=>{
+        const historyMode = state.searchMode === 'history';
+        const modeText = searchModeToggle.querySelector('.search-mode-toggle-state');
+        if(modeText){
+          modeText.textContent = historyMode ? 'On' : 'Off';
+        }
+        searchModeToggle.setAttribute('aria-checked', String(historyMode));
+        searchModeToggle.classList.toggle('active', historyMode);
+        searchModeToggle.setAttribute('title', historyMode ? 'Clan history is on.' : 'Clan history is off.');
+      };
+      syncSearchModeToggle();
+      searchModeToggle.addEventListener('click', ()=>{
+        state.searchMode = state.searchMode === 'current' ? 'history' : 'current';
+        syncSearchModeToggle();
+
+        // Re-apply search (debounced) if there's an active query
+        if(filterInput.value.trim()){
+          debouncedApplySearch();
+        }
+      });
+    }
 
     // Load first server and first clan by default
     const firstServer = [...idx.servers].sort((a,b)=>a.name.localeCompare(b.name))[0];
